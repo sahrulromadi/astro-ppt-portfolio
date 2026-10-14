@@ -59,7 +59,7 @@ const hasCv = existsSync('public/cv.pdf');
 const pitch = 'Turning manual business processes into digital systems that save time, reduce errors, and give teams clear visibility.';
 const pageTitle = `${profile.name} — ${profile.role}, ${profile.focus}`;
 const description = `${profile.role} focused on ${profile.focus.toLowerCase()}. ${appCount} internal applications built and maintained across ${divisionCount} divisions.`;
-const ogImage = Astro.site && new URL('/og.png', Astro.site).href;
+const ogImage = Astro.site && existsSync('public/og.png') && new URL('/og.png', Astro.site).href;
 ---
 
 <!doctype html>
@@ -72,9 +72,19 @@ const ogImage = Astro.site && new URL('/og.png', Astro.site).href;
     <meta name="theme-color" content="#14213d" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <meta property="og:type" content="website" />
+    {Astro.site && <meta property="og:url" content={Astro.site.href} />}
     <meta property="og:title" content={pageTitle} />
     <meta property="og:description" content={description} />
-    {ogImage && <meta property="og:image" content={ogImage} />}
+    {
+      ogImage && (
+        <>
+          <meta property="og:image" content={ogImage} />
+          <meta property="og:image:width" content="1200" />
+          <meta property="og:image:height" content="630" />
+          <meta property="og:image:alt" content={`${profile.name} — ${profile.focus}`} />
+        </>
+      )
+    }
     <meta name="twitter:card" content="summary_large_image" />
   </head>
   <body>

@@ -71,7 +71,7 @@ A personal portfolio that works like a slide deck: full-screen slides you move t
   ```
 
 - **CV** — add `public/cv.pdf`; the *Download CV* button on the last slide appears automatically.
-- **Link preview image** — add `public/og.png` (1200×630) and set `site` in [`astro.config.mjs`](astro.config.mjs).
+- **Link preview image** — `public/og.png` (1200×630, keep it under ~300 KB for WhatsApp); `site` in [`astro.config.mjs`](astro.config.mjs) turns it into the absolute `og:image` URL.
 
 ## Development
 

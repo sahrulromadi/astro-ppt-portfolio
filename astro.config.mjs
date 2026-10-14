@@ -3,7 +3,7 @@ import { defineConfig } from 'astro/config';
 import vercel from '@astrojs/vercel';
 
 export default defineConfig({
-  // Isi dengan URL production agar og:image (public/og.png) ikut dipasang.
-  // site: 'https://nama-anda.vercel.app',
+  // Production URL: used for the absolute og:image / og:url link previews need.
+  site: 'https://sahrulromadi.vercel.app',
   adapter: vercel(),
 });
