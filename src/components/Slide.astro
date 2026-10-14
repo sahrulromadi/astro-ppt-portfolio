@@ -1,0 +1,12 @@
+---
+interface Props {
+  id: string;
+  title: string;
+  dark?: boolean;
+}
+const { id, title, dark = false } = Astro.props;
+---
+
+<section class:list={['slide', { dark }]} id={id} data-title={title} aria-roledescription="slide" aria-label={title}>
+  <div class="slide-inner"><slot /></div>
+</section>

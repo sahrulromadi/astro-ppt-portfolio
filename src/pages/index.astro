@@ -1,0 +1,192 @@
+---
+import { existsSync } from 'node:fs';
+import { getCollection } from 'astro:content';
+import Contacts from '../components/Contacts.astro';
+import Deck from '../components/Deck.astro';
+import Slide from '../components/Slide.astro';
+import '../styles/global.css';
+
+// Portfolio content (from docs/Sahrul Romadi — Interview Portfolio.pptx).
+// Case studies: one file per project in src/content/projects/.
+const profile = {
+  name: 'Sahrul Romadi',
+  role: 'Software Engineer',
+  years: '2 years of experience',
+  focus: 'Enterprise Digitalization',
+  email: 'sahrulromadi12@gmail.com',
+  linkedin: 'https://www.linkedin.com/in/sahrulromadi',
+  github: 'https://github.com/sahrulromadi',
+  experienceLead: 'Three internships, then a full-time role at PT Mineral Alam Abadi.',
+  experience: [
+    { period: '2024', company: 'PT Maleo Edukasi Teknologi', role: 'Full Stack Developer Intern' },
+    { period: '2025', company: 'PT Winnicode Garuda Teknologi', role: 'Full Stack Developer Intern' },
+    { period: '2025 – 2026', company: 'PT Mineral Alam Abadi', role: 'Full Stack Developer Intern' },
+    { period: '2026 – Present', company: 'PT Mineral Alam Abadi', role: 'IT Application & Development Support' },
+  ],
+  // Order = position on the circle, clockwise from the left. Keep Plant next to Procurement:
+  // CPS Automation sits between them.
+  divisions: [
+    { name: 'HRGA', apps: ['HRIS', 'KPI Management', 'Employee Portal', 'Employee Management Dashboard', 'IT Management', 'GA Asset Management', 'GA Inventory'] },
+    { name: 'Legal', apps: ['E-Sign', 'Deed Monitoring'] },
+    { name: 'Technical', apps: ['HSE'] },
+    { name: 'Plant', apps: ['Plant Inventory', 'Supply Chain Tracker', 'System Tracking'] },
+    { name: 'Procurement', apps: ['E-Bidding'] },
+    { name: 'FAT', apps: ['Coretax Sync'] },
+  ],
+  sharedServices: ['Email Service', 'Blob Service', 'Mekari Talenta ETL'],
+  // Position (percent of the diagram box): the empty lower-right corner between Plant and Procurement.
+  bridge: { name: 'CPS Automation', links: ['Plant', 'Procurement'], x: 91, y: 84 },
+  quote:
+    'Digitalization isn’t about replacing paper. It’s about giving people back their time, giving teams visibility they never had, and building systems they can trust.',
+};
+
+const appCount = profile.divisions.reduce((sum, d) => sum + d.apps.length, 0) + profile.sharedServices.length + 1; // + the bridge app
+const divisionCount = profile.divisions.length;
+
+// Circle diagram: Shared Services in the middle, divisions evenly spaced on an ellipse
+// (percent of the diagram box), clockwise from the left so the tallest card (HRGA, first)
+// gets the left slot, where there is the most vertical room.
+const RX = 39;
+const RY = 38;
+const ring = profile.divisions.map((d, i) => {
+  const angle = ((180 + (360 / divisionCount) * i) * Math.PI) / 180;
+  return { ...d, x: +(50 + RX * Math.cos(angle)).toFixed(2), y: +(50 + RY * Math.sin(angle)).toFixed(2) };
+});
+const bridge = { ...profile.bridge, linked: ring.filter((d) => profile.bridge.links.includes(d.name)) };
+const projects = (await getCollection('projects')).sort((a, b) => a.data.order - b.data.order);
+const hasCv = existsSync('public/cv.pdf');
+
+const pitch = 'Turning manual business processes into digital systems that save time, reduce errors, and give teams clear visibility.';
+const pageTitle = `${profile.name} — ${profile.role}, ${profile.focus}`;
+const description = `${profile.role} focused on ${profile.focus.toLowerCase()}. ${appCount} internal applications built and maintained across ${divisionCount} divisions.`;
+const ogImage = Astro.site && new URL('/og.png', Astro.site).href;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{pageTitle}</title>
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#14213d" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={description} />
+    {ogImage && <meta property="og:image" content={ogImage} />}
+    <meta name="twitter:card" content="summary_large_image" />
+  </head>
+  <body>
+    <Deck>
+      <Slide id="home" title="Cover" dark>
+        <span class="eyebrow">{profile.role} · {profile.years}</span>
+        <h1>{profile.name}</h1>
+        <p class="tagline">{profile.focus}</p>
+        <p class="lead">{pitch}</p>
+        <Contacts email={profile.email} linkedin={profile.linkedin} github={profile.github} />
+        <div class="actions">
+          <a class="btn primary" href={projects.length ? `#project-${projects[0].id}` : '#contact'}>View case studies →</a>
+          <a class="btn" href="#contact">Contact</a>
+        </div>
+        <p class="hint">Press <kbd>→</kbd> or swipe to continue · <kbd>O</kbd> for overview</p>
+      </Slide>
+
+      <Slide id="experience" title="Experience">
+        <h2>Experience</h2>
+        <p class="lead">{profile.experienceLead}</p>
+        <ol class="timeline">
+          {
+            profile.experience.map((x) => (
+              <li>
+                <span class="period">{x.period}</span>
+                <h3>{x.company}</h3>
+                <p>{x.role}</p>
+              </li>
+            ))
+          }
+        </ol>
+      </Slide>
+
+      <Slide id="applications" title="Applications I Built & Maintain">
+        <h2>Applications I Built &amp; Maintain</h2>
+        <p class="lead wide">
+          <strong>{appCount} applications</strong> across {divisionCount} divisions, all running on one set of shared services
+        </p>
+        <div class="orbit">
+          <svg class="orbit-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+            <ellipse cx="50" cy="50" rx={RX} ry={RY} />
+            {ring.map((d) => <line x1="50" y1="50" x2={d.x} y2={d.y} />)}
+            {bridge.linked.map((d) => <line class="link" x1={bridge.x} y1={bridge.y} x2={d.x} y2={d.y} />)}
+          </svg>
+          <div class="orbit-hub">
+            <h3>Shared Services <span class="count">{profile.sharedServices.length}</span></h3>
+            <ul>{profile.sharedServices.map((s) => <li>{s}</li>)}</ul>
+          </div>
+          {
+            ring.map((d) => (
+              <div class="orbit-node" style={`--x: ${d.x}; --y: ${d.y}`}>
+                <h3>
+                  {d.name} <span class="count">{d.apps.length}</span>
+                </h3>
+                <ul>{d.apps.map((a) => <li>{a}</li>)}</ul>
+              </div>
+            ))
+          }
+          <div class="orbit-bridge" style={`--x: ${bridge.x}; --y: ${bridge.y}`}>
+            <span>Service</span>
+            <strong>{bridge.name}</strong>
+            <small class="bridge-links">Connects {bridge.links.join(' & ')}</small>
+          </div>
+        </div>
+      </Slide>
+
+      {
+        projects.map(({ id, data: p }) => (
+          <Slide id={`project-${id}`} title={p.title}>
+            <div class="case-head">
+              <div>
+                <h2>{p.title}</h2>
+                <p class="lead">{p.summary}</p>
+              </div>
+              <p class="stat">
+                <strong>{p.stat.value}</strong>
+                <span>{p.stat.label}</span>
+              </p>
+            </div>
+            <div class="case-cols">
+              <div class="card before">
+                <h3>Before</h3>
+                <p>{p.before}</p>
+              </div>
+              <div class="card built">
+                <h3>What I built</h3>
+                <p>{p.built.intro}</p>
+                <ul>{p.built.items.map((item) => <li>{item}</li>)}</ul>
+                {p.built.note && <p>{p.built.note}</p>}
+              </div>
+              <div class="card after">
+                <h3>After</h3>
+                <ul class="checks">{p.after.map((item) => <li>{item}</li>)}</ul>
+              </div>
+            </div>
+          </Slide>
+        ))
+      }
+
+      <Slide id="contact" title="Contact" dark>
+        <h2 class="eyebrow">What drives my work</h2>
+        <blockquote class="quote">“{profile.quote}”</blockquote>
+        <p class="sign">{profile.name}</p>
+        <Contacts email={profile.email} linkedin={profile.linkedin} github={profile.github} />
+        {
+          hasCv && (
+            <div class="actions">
+              <a class="btn primary" href="/cv.pdf" download>Download CV (PDF)</a>
+            </div>
+          )
+        }
+      </Slide>
+    </Deck>
+  </body>
+</html>

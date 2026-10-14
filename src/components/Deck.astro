@@ -1,0 +1,178 @@
+---
+---
+
+<main class="deck" aria-roledescription="carousel" aria-label="Portfolio">
+  <slot />
+</main>
+
+<nav class="deck-nav" aria-label="Slide navigation">
+  <span class="counter" aria-live="polite"></span>
+  <ol class="dots"></ol>
+  <div class="arrows">
+    <button class="nav-btn" type="button" data-overview aria-pressed="false" aria-label="Overview" title="Overview (O)">
+      <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+        <rect x="3" y="3" width="7.5" height="7.5" rx="1.5"></rect>
+        <rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5"></rect>
+        <rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"></rect>
+        <rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"></rect>
+      </svg>
+    </button>
+    <button class="nav-btn" type="button" data-step="-1" aria-label="Previous slide">←</button>
+    <button class="nav-btn" type="button" data-step="1" aria-label="Next slide">→</button>
+  </div>
+</nav>
+<div class="progress" aria-hidden="true"><span></span></div>
+
+<script>
+  const root = document.documentElement;
+  const deck = document.querySelector<HTMLElement>('.deck')!;
+  const slides = [...deck.querySelectorAll<HTMLElement>('.slide')];
+  const counter = document.querySelector<HTMLElement>('.counter')!;
+  const bar = document.querySelector<HTMLElement>('.progress span')!;
+  const dots = document.querySelector<HTMLOListElement>('.dots')!;
+  const prev = document.querySelector<HTMLButtonElement>('[data-step="-1"]')!;
+  const next = document.querySelector<HTMLButtonElement>('[data-step="1"]')!;
+  const overviewBtn = document.querySelector<HTMLButtonElement>('[data-overview]')!;
+  const n = slides.length;
+  let current = 0;
+  let overview = false;
+
+  // Explicit inputs only scroll the deck; the observer below decides which slide is active.
+  const goTo = (i: number) => {
+    deck.scrollTo({ left: slides[Math.max(0, Math.min(n - 1, i))].offsetLeft });
+  };
+
+  const dotButtons = slides.map((s, i) => {
+    s.setAttribute('aria-label', `${i + 1} of ${n}: ${s.dataset.title}`);
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.setAttribute('aria-label', `Go to slide ${i + 1}: ${s.dataset.title}`);
+    b.addEventListener('click', () => goTo(i));
+    dots.appendChild(document.createElement('li')).appendChild(b);
+    return b;
+  });
+
+  const mark = (el: Element, on: boolean) => (on ? el.setAttribute('aria-current', 'true') : el.removeAttribute('aria-current'));
+
+  const setActive = (i: number) => {
+    current = i;
+    slides.forEach((s, j) => {
+      s.inert = j !== i;
+      mark(s, j === i);
+    });
+    dotButtons.forEach((b, j) => mark(b, j === i));
+    counter.textContent = `${i + 1} / ${n}`;
+    bar.style.transform = `scaleX(${(i + 1) / n})`;
+    prev.hidden = i === 0;
+    next.hidden = i === n - 1;
+    root.dataset.tone = slides[i].classList.contains('dark') ? 'dark' : 'light';
+    history.replaceState(null, '', `#${slides[i].id}`);
+  };
+
+  // Single source of truth: works for buttons, keyboard, wheel AND native swipe.
+  const io = new IntersectionObserver(
+    (entries) => {
+      if (overview) return;
+      for (const e of entries) if (e.isIntersecting) setActive(slides.indexOf(e.target as HTMLElement));
+    },
+    { root: deck, threshold: 0.6 },
+  );
+  slides.forEach((s) => io.observe(s));
+
+  // Overview (slide sorter): the deck becomes a grid and each slide is zoomed down to a
+  // thumbnail. Thumbnails are focusable buttons; their content is inert.
+  const fitOverview = () => {
+    const cols = innerWidth >= 1200 ? 4 : innerWidth >= 700 ? 3 : 2;
+    const pad = 32; // keep in sync with --pad / --gap in .overview .deck
+    const gap = 24;
+    root.style.setProperty('--cols', String(cols));
+    root.style.setProperty('--scale', ((innerWidth - 2 * pad - gap * (cols - 1)) / cols / innerWidth).toFixed(4));
+  };
+
+  const setOverview = (on: boolean, target = current) => {
+    overview = on;
+    root.classList.toggle('overview', on);
+    overviewBtn.setAttribute('aria-pressed', String(on));
+    slides.forEach((s) => {
+      (s.firstElementChild as HTMLElement).inert = on;
+      if (on) {
+        s.inert = false;
+        s.tabIndex = 0;
+        s.setAttribute('role', 'button');
+        s.removeAttribute('aria-roledescription');
+      } else {
+        s.removeAttribute('tabindex');
+        s.removeAttribute('role');
+        s.setAttribute('aria-roledescription', 'slide');
+      }
+    });
+    if (on) {
+      fitOverview();
+      root.dataset.tone = 'light';
+      slides[target].focus({ preventScroll: true });
+      slides[target].scrollIntoView({ block: 'nearest' });
+    } else {
+      deck.scrollTo({ left: slides[target].offsetLeft, behavior: 'instant' });
+      setActive(target);
+    }
+  };
+
+  overviewBtn.addEventListener('click', () => setOverview(!overview));
+  deck.addEventListener('click', (e) => {
+    const s = overview && (e.target as HTMLElement).closest<HTMLElement>('.slide');
+    if (s) setOverview(false, slides.indexOf(s));
+  });
+  addEventListener('resize', () => overview && fitOverview());
+
+  prev.addEventListener('click', () => goTo(current - 1));
+  next.addEventListener('click', () => goTo(current + 1));
+
+  addEventListener('keydown', (e) => {
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
+    const t = e.target as HTMLElement;
+    if (t.closest('input, textarea, select, [contenteditable]')) return;
+    if (overview) {
+      if (e.key === 'Escape' || e.key === 'o' || e.key === 'O') setOverview(false);
+      else if ((e.key === 'Enter' || e.key === ' ') && t.classList.contains('slide')) setOverview(false, slides.indexOf(t));
+      else return; // Tab and arrows keep their native behaviour in the grid
+      e.preventDefault();
+      return;
+    }
+    if (e.key === ' ' && t.closest('a, button')) return; // Space activates the focused control
+    if (e.key === 'o' || e.key === 'O') setOverview(true);
+    else if (e.key === 'ArrowRight' || e.key === 'PageDown' || (e.key === ' ' && !e.shiftKey)) goTo(current + 1);
+    else if (e.key === 'ArrowLeft' || e.key === 'PageUp' || e.key === ' ') goTo(current - 1);
+    else if (e.key === 'Home') goTo(0);
+    else if (e.key === 'End') goTo(n - 1);
+    else return;
+    e.preventDefault();
+  });
+
+  // Vertical wheel/trackpad → one slide per gesture. The lock lifts 200 ms after the last
+  // wheel event, so trackpad inertia never moves a second slide.
+  let wheelLocked = false;
+  let wheelTimer = 0;
+  addEventListener(
+    'wheel',
+    (e) => {
+      if (overview || e.ctrlKey || Math.abs(e.deltaX) >= Math.abs(e.deltaY)) return; // grid scroll, pinch-zoom, horizontal swipe: native
+      const s = slides[current];
+      const canScrollInside = e.deltaY > 0 ? s.scrollTop + s.clientHeight < s.scrollHeight - 1 : s.scrollTop > 0;
+      if (canScrollInside) return; // let a tall slide scroll its own content first
+      e.preventDefault();
+      clearTimeout(wheelTimer);
+      wheelTimer = window.setTimeout(() => (wheelLocked = false), 200);
+      if (wheelLocked) return;
+      wheelLocked = true;
+      goTo(current + Math.sign(e.deltaY));
+    },
+    { passive: false },
+  );
+
+  const start = Math.max(0, slides.findIndex((s) => `#${s.id}` === location.hash));
+  deck.scrollTo({ left: slides[start].offsetLeft, behavior: 'instant' });
+  setActive(start);
+
+  // Visit tracking: IP, user agent and time are read server-side by /api/hit.
+  navigator.sendBeacon('/api/hit');
+</script>
