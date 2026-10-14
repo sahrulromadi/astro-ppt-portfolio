@@ -86,7 +86,7 @@ const ogImage = Astro.site && new URL('/og.png', Astro.site).href;
         <p class="lead">{pitch}</p>
         <Contacts email={profile.email} linkedin={profile.linkedin} github={profile.github} />
         <div class="actions">
-          <a class="btn primary" href={projects.length ? `#project-${projects[0].id}` : '#contact'}>View case studies →</a>
+          {hasCv && <a class="btn primary" href="/cv.pdf" download={`CV - ${profile.name}.pdf`}>Download CV (PDF)</a>}
           <a class="btn" href="#contact">Contact</a>
         </div>
         <p class="hint">Press <kbd>→</kbd> or swipe to continue · <kbd>O</kbd> for overview</p>
@@ -182,7 +182,7 @@ const ogImage = Astro.site && new URL('/og.png', Astro.site).href;
         {
           hasCv && (
             <div class="actions">
-              <a class="btn primary" href="/cv.pdf" download>Download CV (PDF)</a>
+              <a class="btn primary" href="/cv.pdf" download={`CV - ${profile.name}.pdf`}>Download CV (PDF)</a>
             </div>
           )
         }
