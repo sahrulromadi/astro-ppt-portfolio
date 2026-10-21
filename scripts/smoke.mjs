@@ -30,11 +30,9 @@ const ws = new WebSocket(page.webSocketDebuggerUrl);
 await new Promise((r) => (ws.onopen = r));
 let id = 0;
 const pending = new Map();
-const hits = []; // requests to the tracking endpoint
 ws.onmessage = (m) => {
   const d = JSON.parse(m.data);
   if (d.id && pending.has(d.id)) pending.get(d.id)(d.result ?? d), pending.delete(d.id);
-  if (d.method === 'Network.requestWillBeSent' && d.params.request.url.endsWith('/api/hit')) hits.push(d.params.request.method);
 };
 const send = (method, params = {}) =>
   new Promise((r) => {
@@ -71,14 +69,10 @@ const expect = async (label, want) => {
 
 await send('Page.enable');
 await send('Runtime.enable');
-await send('Network.enable');
 await load(BASE);
 const total = await js(`document.querySelectorAll('.slide').length`);
 const lastId = await js(`[...document.querySelectorAll('.slide')].at(-1).id`);
 await expect('initial', { counter: `1 / ${total}`, hash: '#home' });
-const beaconOk = hits.length === 1 && hits[0] === 'POST';
-if (!beaconOk) failures++;
-console.log(`${beaconOk ? 'PASS' : 'FAIL'} one tracking beacon per page load: ${JSON.stringify(hits)}`);
 await shot('desktop-1-cover');
 
 await key('ArrowRight', 'ArrowRight', 39);

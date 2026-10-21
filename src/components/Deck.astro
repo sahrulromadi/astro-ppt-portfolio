@@ -172,7 +172,4 @@
   const start = Math.max(0, slides.findIndex((s) => `#${s.id}` === location.hash));
   deck.scrollTo({ left: slides[start].offsetLeft, behavior: 'instant' });
   setActive(start);
-
-  // Visit tracking: IP, user agent and time are read server-side by /api/hit.
-  navigator.sendBeacon('/api/hit');
 </script>

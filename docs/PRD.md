@@ -165,17 +165,15 @@ Deploy lewat integrasi GitHub: tiap push ke `main` otomatis jadi production, tia
 5. Klik **Deploy** → situs aktif di `<nama-proyek>.vercel.app`.
 6. Opsional: **Settings → Domains** untuk domain sendiri, lalu tambahkan record DNS sesuai instruksi Vercel.
 
-Output statis tidak butuh adapter `@astrojs/vercel` atau `vercel.json`. Adapter baru perlu kalau nanti ada fitur server, yaitu endpoint tracking di v2 (`npx astro add vercel`). Alternatif tanpa GitHub: `npx vercel` dari folder proyek.
+Output statis tidak butuh adapter `@astrojs/vercel` atau `vercel.json`. Adapter baru perlu kalau nanti ada fitur server (`npx astro add vercel`). Alternatif tanpa GitHub: `npx vercel` dari folder proyek.
 
 ## Roadmap v2 & Di Luar Cakupan
 
-v2 berisi dua fitur: overview mode dan tracking pengunjung. **Mode gelap dibatalkan.** Fitur lain ditunda sampai v2 live.
+v2 berisi satu fitur: overview mode. **Mode gelap dibatalkan.** **Tracking pengunjung dihapus** pada 2026-10-21 (tabel Supabase `portfolio_visits` sudah dihapus). Fitur lain ditunda sampai v2 live.
 
 **v2 — disepakati**
 
 - **Overview mode** — tekan `O` → semua slide tampil sebagai grid thumbnail (seperti Slide Sorter di PowerPoint); klik atau Enter untuk lompat, `O`/`Esc` untuk keluar. Juga lewat tombol grid di bar navigasi. Cukup toggle class `overview` yang mengubah deck jadi grid + CSS `zoom` per slide, tanpa library.
-- **Tracking pengunjung** — catat IP, user agent, dan waktu buka tiap kunjungan. Detail di bagian berikutnya.
-
 **Ditunda (belum dijadwalkan)**
 
 - Cetak / simpan PDF: `@media print` satu slide per halaman.
@@ -190,83 +188,6 @@ v2 berisi dua fitur: overview mode dan tracking pengunjung. **Mode gelap dibatal
 - React/Next.js.
 - Identifikasi perusahaan lewat IP (reverse-IP) — layanan berbayar, tidak akurat untuk jaringan seluler/rumah, dan menyentuh data pribadi.
 
-## Tracking Pengunjung (v2)
-
-v2 mencatat tiga hal tiap kali halaman dibuka: IP, user agent, dan waktu. Datanya disimpan di tabel Postgres milik sendiri di **Supabase** (lewat integrasi Supabase di Vercel Marketplace) oleh satu endpoint Astro. Tanpa library tambahan: endpoint memanggil REST API Supabase dengan `fetch`. Umami dan Vercel Analytics tidak dipakai karena keduanya tidak menyimpan IP mentah.
-
-**Alur**
-
-1. Halaman selesai dimuat → browser memanggil `navigator.sendBeacon('/api/hit')`.
-2. Endpoint `/api/hit` membaca IP dari header `x-real-ip` (diisi Vercel, tidak bisa dipalsukan pengunjung) dan user agent dari header `user-agent`.
-3. Endpoint mengirim `POST {SUPABASE_URL}/rest/v1/portfolio_visits` dengan secret key di header `apikey`; kolom waktu diisi otomatis oleh database.
-4. Data dilihat lewat Table Editor atau SQL Editor di dashboard Supabase.
-
-Halaman tetap statis; hanya `/api/hit` yang berjalan sebagai function. Pengunjung tanpa JavaScript (kebanyakan bot) tidak tercatat. Tanpa `SUPABASE_URL` / `SUPABASE_SECRET_KEY` (lokal, preview) endpoint membalas 204 tanpa menyimpan.
-
-**Tabel** — sudah dibuat di project Supabase (region Tokyo, `ap-northeast-1`) pada 2026-10-14
-
-```sql
-create table public.portfolio_visits (
-  id bigint generated always as identity primary key,
-  visited_at timestamptz not null default now(),  -- waktu halaman dibuka (UTC)
-  ip_address text not null,                       -- IP publik pengunjung, dari header x-real-ip Vercel
-  user_agent text not null                        -- user agent browser, maks. 512 karakter
-);
--- RLS aktif tanpa policy: publishable key tidak bisa membaca/menulis; hanya secret key (server) yang bisa.
-alter table public.portfolio_visits enable row level security;
-grant insert on public.portfolio_visits to service_role;
-```
-
-Sudah diuji langsung: secret key bisa insert (HTTP 201), publishable key ditolak saat insert (401) dan membaca 0 baris.
-
-**Endpoint** — `src/pages/api/hit.ts`
-
-```ts
-import type { APIRoute } from 'astro';
-
-export const prerender = false; // satu-satunya route yang tidak statis
-
-const { SUPABASE_URL, SUPABASE_SECRET_KEY } = process.env;
-
-export const POST: APIRoute = async ({ request }) => {
-  // Kunjungan saat dev = kunjungan sendiri; preview tanpa env var tidak punya tujuan.
-  if (import.meta.env.DEV || !SUPABASE_URL || !SUPABASE_SECRET_KEY) return new Response(null, { status: 204 });
-
-  const row = {
-    ip_address: request.headers.get('x-real-ip') ?? '',
-    user_agent: (request.headers.get('user-agent') ?? '').slice(0, 512),
-  };
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/portfolio_visits`, {
-    method: 'POST',
-    headers: { apikey: SUPABASE_SECRET_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-    body: JSON.stringify(row),
-  });
-  if (!res.ok) console.error('portfolio_visits insert failed', res.status, await res.text());
-  return new Response(null, { status: 204 });
-};
-```
-
-**Di halaman** — satu baris di akhir script `Deck.astro`: `navigator.sendBeacon('/api/hit');`
-
-**Setup**
-
-1. ~~Buat tabel~~ — sudah dibuat.
-2. Vercel → proyek → **Settings → Environment Variables**: isi `SUPABASE_URL` dan `SUPABASE_SECRET_KEY` (nilainya sama dengan di `.env` lokal; `.env` tidak ikut ter-deploy).
-3. Redeploy agar environment variable terbaca.
-
-Kunjungan dari `npm run dev` sengaja tidak dicatat; data baru masuk dari situs yang sudah di-deploy.
-
-**Melihat data** — Table Editor → `portfolio_visits`, atau SQL Editor:
-
-```sql
-select visited_at at time zone 'Asia/Jakarta' as waktu, ip_address, user_agent
-from portfolio_visits
-order by visited_at desc
-limit 100;
-```
-
-Batasan: endpoint publik tanpa rate limit, jadi siapa pun bisa mengirim baris palsu; tambahkan rate limit kalau itu terjadi. Tiap refresh = satu baris baru. Secret key hanya ada di server (env Vercel), tidak pernah dikirim ke browser.
-
 ## Milestone & Kriteria Selesai
 
 Lima milestone berurutan (M1–M4 = v1, M5 = v2); deploy ke Vercel sudah dilakukan di milestone pertama supaya tiap perubahan langsung bisa dicek di URL asli.
@@ -275,7 +196,7 @@ Lima milestone berurutan (M1–M4 = v1, M5 = v2); deploy ke Vercel sudah dilakuk
 2. **M2 Navigasi** — keyboard, tombol, counter, progress bar, hash URL, wheel, dots.
 3. **M3 Konten** — isi semua slide, koleksi proyek (Markdown), screenshot, CV PDF, meta tag dan gambar OG.
 4. **M4 Poles** — responsif, aksesibilitas, Lighthouse ≥ 90, uji di HP Android dan iPhone nyata. v1 rilis.
-5. **M5 v2** — overview mode, tracking IP, user agent, dan waktu buka ke Supabase.
+5. **M5 v2** — overview mode.
 
 **Kriteria selesai v1**
 
@@ -293,10 +214,6 @@ Lima milestone berurutan (M1–M4 = v1, M5 = v2); deploy ke Vercel sudah dilakuk
 **Kriteria selesai v2**
 
 - [ ] `O` membuka overview grid; klik atau Enter lompat ke slide itu; `O`/`Esc` menutup.
-- [ ] Membuka situs dari HP → satu baris baru di `portfolio_visits` berisi IP publik HP, user agent-nya, dan waktu yang benar (WIB).
-- [ ] Halaman selain `/api/hit` tetap statis (di Vercel hanya ada satu function).
-- [ ] Lighthouse tetap ≥ 90 setelah tracking terpasang.
-
 ## Pertanyaan Terbuka
 
 Empat pertanyaan pertama sudah terjawab dari deck interview; sisanya masih terbuka.
@@ -308,11 +225,3 @@ Empat pertanyaan pertama sudah terjawab dari deck interview; sisanya masih terbu
 - [ ] Domain sendiri atau cukup `*.vercel.app`?
 - [ ] Di HP: tetap swipe horizontal (default PRD ini) atau berubah jadi scroll vertikal?
 - [ ] File `public/cv.pdf` dan `public/og.png` (1200×630).
-
-## Sumber
-
-- [Vercel — Request headers](https://vercel.com/docs/headers/request-headers) (`x-real-ip`, `x-forwarded-for`)
-- [Supabase — API keys](https://supabase.com/docs/guides/api/api-keys) (secret key di header `apikey`, bypass RLS)
-- [Vercel Marketplace — Supabase](https://vercel.com/marketplace/supabase) (env var `SUPABASE_URL`, `SUPABASE_SECRET_KEY`)
-- [Vercel — Pricing for Web Analytics](https://vercel.com/docs/analytics/limits-and-pricing)
-- [Umami — Pricing](https://umami.is/pricing)
