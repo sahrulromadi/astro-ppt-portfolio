@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs';
 import { getCollection } from 'astro:content';
 import Contacts from '../components/Contacts.astro';
 import Deck from '../components/Deck.astro';
+import Intro from '../components/Intro.astro';
 import Slide from '../components/Slide.astro';
 import '../styles/global.css';
 
@@ -89,6 +90,8 @@ const ogImage = Astro.site && existsSync('public/og.png') && new URL('/og.png', 
   </head>
   <body>
     <Deck>
+      <Intro />
+
       <Slide id="home" title="Cover" dark>
         <span class="eyebrow">{profile.role} · {profile.years}</span>
         <h1>{profile.name}</h1>

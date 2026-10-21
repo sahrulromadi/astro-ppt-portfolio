@@ -1,0 +1,43 @@
+---
+import Slide from './Slide.astro';
+---
+
+<Slide id="intro" title="Intro" dark>
+  <div class="intro">
+    <canvas aria-hidden="true"></canvas>
+    <div class="intro-title" aria-hidden="true">
+      <p class="intro-head">Less paperwork. More clarity.</p>
+      <p class="tagline">Giving people back their time.</p>
+    </div>
+    <div class="intro-panel" aria-hidden="true">
+      <p><span><i class="led"></i>System</span><b data-status>Online</b></p>
+      <p><span>Digitized</span><b data-count>24 / 24</b></p>
+      <div class="bar"><span></span></div>
+    </div>
+    <div class="intro-foot">
+      <p class="intro-caption">Connected. Visible. Trusted.</p>
+      <div class="intro-end">
+        <button class="intro-replay" type="button">↻ Replay</button>
+        <p class="hint">Press <kbd>→</kbd> or swipe to continue</p>
+      </div>
+    </div>
+  </div>
+</Slide>
+
+<script>
+  // The scene (intro-scene.ts, with Three.js) is downloaded the first time the deck makes this slide current.
+  // It plays from the start every time the slide is shown again and pauses when it leaves.
+  const intro = document.querySelector<HTMLElement>('.intro');
+  const slide = intro?.closest<HTMLElement>('.slide');
+  if (intro && slide) {
+    // No WebGL or a failed download: the slide keeps its static caption.
+    const load = () => import('./intro-scene').then((m) => m.build(intro)).catch(() => null);
+    let player: ReturnType<typeof load> | undefined;
+    const sync = async () => {
+      if (slide.hasAttribute('aria-current')) player ??= load();
+      (await player)?.[slide.hasAttribute('aria-current') ? 'play' : 'pause']();
+    };
+    new MutationObserver(sync).observe(slide, { attributeFilter: ['aria-current'] });
+    sync();
+  }
+</script>

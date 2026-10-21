@@ -145,6 +145,182 @@ ul {
   }
 }
 
+/* ---------- Intro slide (3D scene, Intro.astro) ---------- */
+
+.slide:has(.intro) {
+  position: relative;
+}
+
+.intro {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.intro canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.intro-foot {
+  position: absolute;
+  inset: auto 16px calc(var(--nav-h) + 16px);
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  text-align: center;
+}
+
+.intro-caption {
+  margin: 0;
+  font-size: clamp(1.1rem, 2.6vw, 1.75rem);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--heading);
+  text-shadow: 0 2px 12px rgb(0 0 0 / 0.6); /* stays legible over the glowing floor */
+}
+
+.intro-end {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 8px 20px;
+  visibility: hidden; /* shown when the animation has finished */
+}
+
+.intro-end.on {
+  visibility: visible;
+}
+
+.intro-end .hint {
+  margin: 0;
+}
+
+.intro-replay {
+  min-height: 44px;
+  padding: 0 18px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--heading);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.intro-replay:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* HUD panel pinned above the server by intro-scene.ts */
+.intro-panel {
+  position: absolute;
+  top: 0;
+  left: 0;
+  min-width: 190px;
+  padding: 10px 14px;
+  border: 1px solid rgb(127 167 255 / 0.35);
+  border-radius: 6px;
+  background: rgb(12 22 48 / 0.75);
+  font: 600 0.72rem/1.5 ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  opacity: 0;
+  transition: opacity 0.4s;
+}
+
+.intro-panel.on {
+  opacity: 1;
+}
+
+.intro-title {
+  position: absolute;
+  inset: clamp(24px, 8vh, 88px) 16px auto;
+  text-align: center;
+  text-wrap: balance;
+  opacity: 0;
+  transform: translateY(16px);
+  transition: opacity 1s, transform 1s;
+}
+
+.intro-title.on {
+  opacity: 1;
+  transform: none;
+}
+
+.intro-head {
+  margin: 0;
+  font-size: clamp(2.2rem, min(6.5vw, 10vh), 5rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  /* an amber glint sweeps across once the letters have decoded */
+  background: linear-gradient(110deg, var(--heading) 42%, var(--amber) 50%, var(--heading) 58%) 100% 0 / 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 24px rgb(232 163 61 / 0.4));
+}
+
+.intro-title.on .intro-head {
+  animation: intro-sweep 1.6s 1s ease-in-out both;
+}
+
+@keyframes intro-sweep {
+  to {
+    background-position: 0 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .intro-title.on .intro-head {
+    animation: none;
+  }
+}
+
+.intro-title .tagline {
+  margin: 0.2em 0 0;
+}
+
+.intro-panel p {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0;
+}
+
+.intro-panel b {
+  color: var(--heading);
+}
+
+.intro-panel .led {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+}
+
+.intro-panel .bar {
+  height: 3px;
+  margin: 4px 0 6px;
+  background: var(--border);
+}
+
+.intro-panel .bar span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transform-origin: left;
+  transform: scaleX(0);
+}
+
 /* ---------- Navigation ---------- */
 
 .deck-nav {

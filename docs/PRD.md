@@ -15,7 +15,7 @@ Website portofolio pribadi satu halaman yang tampil seperti presentasi PowerPoin
 **Metrik sukses**
 
 - Lighthouse mobile ≥ 90 untuk Performance, Accessibility, Best Practices, dan SEO.
-- Total JavaScript < 5 KB; halaman pertama (di luar gambar proyek) < 200 KB.
+- JavaScript deck < 5 KB; halaman pertama (di luar gambar proyek dan Three.js) < 200 KB. Scene slide intro dengan Three.js (±145 KB gzip) dimuat terpisah, hanya saat slide intro tampil.
 - Slide Kontak dan tombol unduh CV bisa dicapai dalam ≤ 2 aksi dari mana saja.
 
 ## Target Pengguna
@@ -169,7 +169,7 @@ Output statis tidak butuh adapter `@astrojs/vercel` atau `vercel.json`. Adapter 
 
 ## Roadmap v2 & Di Luar Cakupan
 
-v2 berisi satu fitur: overview mode. **Mode gelap dibatalkan.** **Tracking pengunjung dihapus** pada 2026-10-21 (tabel Supabase `portfolio_visits` sudah dihapus). Fitur lain ditunda sampai v2 live.
+v2 berisi satu fitur: overview mode. **Mode gelap dibatalkan.** **Tracking pengunjung dihapus** pada 2026-10-21 (tabel Supabase `portfolio_visits` sudah dihapus). **Slide intro 3D ditambahkan** pada 2026-10-21: slide pertama berisi scene Three.js kertas → data → satu sistem, diputar ulang tiap kali slide itu tampil (detail di README). Fitur lain ditunda sampai v2 live.
 
 **v2 — disepakati**
 

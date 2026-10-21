@@ -16,6 +16,7 @@ const chrome = spawn(CHROME, [
   '--headless=new',
   '--remote-debugging-port=9333',
   '--window-size=1366,768',
+  '--enable-unsafe-swiftshader', // WebGL for the intro scene without a GPU
   `--user-data-dir=${mkdtempSync(join(tmpdir(), 'smoke-'))}`,
   'about:blank',
 ]);
@@ -30,9 +31,11 @@ const ws = new WebSocket(page.webSocketDebuggerUrl);
 await new Promise((r) => (ws.onopen = r));
 let id = 0;
 const pending = new Map();
+const errors = []; // uncaught exceptions in the page
 ws.onmessage = (m) => {
   const d = JSON.parse(m.data);
   if (d.id && pending.has(d.id)) pending.get(d.id)(d.result ?? d), pending.delete(d.id);
+  if (d.method === 'Runtime.exceptionThrown') errors.push(d.params.exceptionDetails.exception?.description ?? d.params.exceptionDetails.text);
 };
 const send = (method, params = {}) =>
   new Promise((r) => {
@@ -72,20 +75,46 @@ await send('Runtime.enable');
 await load(BASE);
 const total = await js(`document.querySelectorAll('.slide').length`);
 const lastId = await js(`[...document.querySelectorAll('.slide')].at(-1).id`);
-await expect('initial', { counter: `1 / ${total}`, hash: '#home' });
-await shot('desktop-1-cover');
+await expect('initial', { counter: `1 / ${total}`, hash: '#intro' });
+
+// Intro: the 3D scene plays on load, finishes with every form stored, and restarts when you come back.
+const intro = () =>
+  js(`({ caption: document.querySelector('.intro-caption').textContent, stored: document.querySelector('[data-count]').textContent,
+        ended: document.querySelector('.intro-end').classList.contains('on') })`);
+for (const [ms, name] of [[0, 'desktop-0a-boot'], [2800, 'desktop-0b-scanner'], [2800, 'desktop-0c-stream'], [2600, 'desktop-0d-network']]) {
+  await sleep(ms);
+  await shot(name);
+}
+await sleep(3000);
+const ended = await intro();
+const endedOk = ended.ended && ended.stored === '24 / 24' && ended.caption === 'Connected. Visible. Trusted.';
+if (!endedOk) failures++;
+console.log(`${endedOk ? 'PASS' : 'FAIL'} intro plays to the end: ${JSON.stringify(ended)}`);
+await shot('desktop-1-intro-end');
+// Mouse over the scene: parallax, floor spotlight and particle trail.
+for (let i = 0; i < 12; i++) {
+  await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 300 + i * 60, y: 430 + (i % 3) * 20 });
+  await sleep(40);
+}
+await sleep(200);
+await shot('desktop-1b-cursor');
 
 await key('ArrowRight', 'ArrowRight', 39);
-await expect('ArrowRight', { counter: `2 / ${total}`, hash: '#experience' });
+await expect('ArrowRight', { counter: `2 / ${total}`, hash: '#home' });
+await shot('desktop-2-cover');
 await key(' ', 'Space', 32);
-await expect('Space', { counter: `3 / ${total}`, hash: '#applications' });
+await expect('Space', { counter: `3 / ${total}`, hash: '#experience' });
 await key(' ', 'Space', 32, true);
-await expect('Shift+Space', { counter: `2 / ${total}`, hash: '#experience' });
+await expect('Shift+Space', { counter: `2 / ${total}`, hash: '#home' });
 await key('End', 'End', 35);
 await expect('End', { counter: `${total} / ${total}`, hash: `#${lastId}` });
-await shot('desktop-2-contact');
+await shot('desktop-3-contact');
 await key('Home', 'Home', 36);
-await expect('Home', { counter: `1 / ${total}`, hash: '#home' });
+await expect('Home', { counter: `1 / ${total}`, hash: '#intro' });
+const replay = await intro();
+const replayOk = !replay.ended && replay.stored === '0 / 24';
+if (!replayOk) failures++;
+console.log(`${replayOk ? 'PASS' : 'FAIL'} intro restarts when shown again: ${JSON.stringify(replay)}`);
 
 // One wheel gesture (20 events, ~16 ms apart, like trackpad inertia) = one slide.
 for (let i = 0; i < 20; i++) {
@@ -93,16 +122,16 @@ for (let i = 0; i < 20; i++) {
   await sleep(16);
 }
 await sleep(900);
-await expect('wheel gesture', { counter: `2 / ${total}`, hash: '#experience' });
+await expect('wheel gesture', { counter: `2 / ${total}`, hash: '#home' });
 
 // Next button, then dot click.
 await js(`document.querySelector('[data-step="1"]').click()`);
 await sleep(900);
-await expect('next button', { counter: `3 / ${total}`, hash: '#applications' });
+await expect('next button', { counter: `3 / ${total}`, hash: '#experience' });
 await js(`document.querySelectorAll('.dots button')[4].click()`);
 await sleep(1200);
 await expect('dot 5', { counter: `5 / ${total}`, hash: (await js(`'#' + document.querySelectorAll('.slide')[4].id`)) });
-await shot('desktop-3-project');
+await shot('desktop-4-project');
 
 // Deep link.
 await load(`${BASE}#contact`);
@@ -117,7 +146,7 @@ const ov = await js(`({ on: document.documentElement.classList.contains('overvie
 const ovOk = ov.on && ov.clickable === total && ov.contentInert;
 if (!ovOk) failures++;
 console.log(`${ovOk ? 'PASS' : 'FAIL'} O opens overview: ${JSON.stringify(ov)}`);
-await shot('desktop-4-overview');
+await shot('desktop-5-overview');
 const fourth = await js(`'#' + document.querySelectorAll('.slide')[3].id`);
 await js(`document.querySelectorAll('.slide')[3].click()`);
 await sleep(900);
@@ -136,7 +165,7 @@ for (let i = 0; i < 8; i++) {
   await send('Input.dispatchKeyEvent', { type: 'rawKeyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
   await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
   const where = await js(`document.activeElement.closest('.slide')?.id ?? 'outside-slide'`);
-  if (where !== 'home' && where !== 'outside-slide') tabOk = false;
+  if (where !== 'intro' && where !== 'outside-slide') tabOk = false;
 }
 if (!tabOk) failures++;
 console.log(`${tabOk ? 'PASS' : 'FAIL'} Tab stays in active slide`);
@@ -150,6 +179,11 @@ await send('Emulation.setEmulatedMedia', { features: [] });
 
 // Phone viewport screenshots.
 await send('Emulation.setDeviceMetricsOverride', { width: 360, height: 640, deviceScaleFactor: 2, mobile: true });
+await load(`${BASE}#intro`);
+await sleep(5000); // mid-way: cubes streaming into the server
+await shot('phone-0a-intro');
+await sleep(7000);
+await shot('phone-0b-intro-end');
 for (const [hash, name] of [['#home', 'phone-1-cover'], ['#applications', 'phone-2-applications'], [`#${await js(`document.querySelectorAll('.slide')[4].id`)}`, 'phone-3-project'], ['#contact', 'phone-4-contact']]) {
   await load(`${BASE}${hash}`);
   await shot(name);
@@ -157,6 +191,9 @@ for (const [hash, name] of [['#home', 'phone-1-cover'], ['#applications', 'phone
 const overflow = await js(`[...document.querySelectorAll('.slide')].filter(s => s.scrollWidth > s.clientWidth + 1).map(s => s.id)`);
 if (overflow.length) failures++;
 console.log(`${overflow.length ? 'FAIL' : 'PASS'} no horizontal overflow inside slides at 360px ${JSON.stringify(overflow)}`);
+
+if (errors.length) failures++;
+console.log(`${errors.length ? 'FAIL' : 'PASS'} no uncaught page errors ${JSON.stringify(errors)}`);
 
 console.log(failures ? `\n${failures} FAILED` : '\nALL PASS');
 ws.close();
